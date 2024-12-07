@@ -187,6 +187,7 @@ rust_analyzer_aspect = aspect(
     doc = "Annotates rust rules with RustAnalyzerInfo later used to build a rust-project.json",
 )
 
+_WORKSPACE_TEMPLATE = "__WORKSPACE__/"
 _EXEC_ROOT_TEMPLATE = "__EXEC_ROOT__/"
 _OUTPUT_BASE_TEMPLATE = "__OUTPUT_BASE__/"
 
@@ -222,10 +223,17 @@ def _create_single_crate(ctx, attrs, info):
     # TODO: Some folks may want to override this for vendored dependencies.
     is_external = info.crate.root.path.startswith("external/")
     is_generated = not info.crate.root.is_source
-    path_prefix = _EXEC_ROOT_TEMPLATE if is_external or is_generated else ""
+    path_prefix = _EXEC_ROOT_TEMPLATE if is_external or is_generated else _WORKSPACE_TEMPLATE
     crate["is_workspace_member"] = not is_external
     crate["root_module"] = path_prefix + info.crate.root.path
     crate["source"] = {"exclude_dirs": [], "include_dirs": []}
+
+    # Store build system related info only for local crates
+    if not is_external and not is_generated:
+        crate["build"] = {
+            "label": ctx.label.package + ":" + ctx.label.name,
+            "build_file": _WORKSPACE_TEMPLATE + ctx.build_file_path,
+        }
 
     if is_generated:
         srcs = getattr(ctx.rule.files, "srcs", [])
